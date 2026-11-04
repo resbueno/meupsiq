@@ -7,6 +7,7 @@ app_name = "contas"
 urlpatterns = [
     path("entrar/", views.entrar, name="entrar"),
     path("entrar/2fa/", views.verificar_2fa, name="verificar_2fa"),
+    path("entrar/demonstracao/", views.explorar_demo, name="explorar_demo"),
     path("sair/", views.sair, name="sair"),
     path("conta/ver-como/<uuid:usuario_pk>/", views.ver_como, name="ver_como"),
     path("consultorio/escolher/", views.escolher_consultorio, name="escolher_consultorio"),

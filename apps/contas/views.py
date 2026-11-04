@@ -43,6 +43,35 @@ def _consultorio_do_slug(slug):
     return get_object_or_404(Consultorio.objects.exclude(status=Consultorio.Status.ENCERRADO), slug=slug)
 
 
+def _vinculo_demo():
+    """Vinculo admin usado pelo botao de demonstracao, so se configurado e num consultorio de demonstracao."""
+    email = settings.MEUPSIQ_DEMO_EXPLORAR_EMAIL
+    if not email:
+        return None
+    usuario = Usuario.objects.filter(email=email, is_active=True, is_staff=False).first()
+    if usuario is None:
+        return None
+    with contexto(usuario_id=usuario.pk):
+        return (
+            Vinculo.objects.filter(
+                usuario=usuario, perfil=Perfil.ADMIN, ativo=True,
+                consultorio__slug__in=settings.MEUPSIQ_CONSULTORIOS_SEM_2FA,
+            ).select_related("usuario", "consultorio").first()
+        )
+
+
+@require_POST
+def explorar_demo(request):
+    """Entra no consultorio de demonstracao em modo somente leitura, sem senha."""
+    vinculo = _vinculo_demo()
+    if vinculo is None:
+        raise Http404
+    resposta = _concluir_login(request, vinculo.usuario, segundo_fator=True, consultorio_alvo=vinculo.consultorio)
+    request.session["modo_demo"] = True
+    messages.info(request, "Você está explorando a demonstração em modo somente leitura. Nada pode ser alterado.")
+    return resposta
+
+
 def entrar(request, slug=None):
     consultorio = _consultorio_do_slug(slug) if slug else None
     if request.user.is_authenticated:
@@ -55,7 +84,7 @@ def entrar(request, slug=None):
         if usuario and usuario.bloqueado:
             auditoria.registrar(request, "login_bloqueado", "usuario", usuario.pk, usuario=usuario)
             messages.error(request, MENSAGEM_LOGIN_INVALIDO)
-            return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio}, status=429)
+            return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio, "demo_disponivel": slug is None and _vinculo_demo() is not None}, status=429)
 
         autenticado = authenticate(request, username=email, password=form.cleaned_data["senha"])
         if autenticado is None:
@@ -65,7 +94,7 @@ def entrar(request, slug=None):
                 request, "login_falha", "usuario", usuario.pk if usuario else "", usuario=usuario, email=email
             )
             messages.error(request, MENSAGEM_LOGIN_INVALIDO)
-            return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio}, status=401)
+            return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio, "demo_disponivel": slug is None and _vinculo_demo() is not None}, status=401)
 
         if consultorio is not None and not _tem_vinculo_no_consultorio(autenticado, consultorio):
             # Credenciais validas, mas sem acesso a ESTE consultorio: mesma mensagem, para nao revelar qual parte falhou.
@@ -74,7 +103,7 @@ def entrar(request, slug=None):
                 consultorio_id=consultorio.pk,
             )
             messages.error(request, MENSAGEM_LOGIN_INVALIDO)
-            return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio}, status=401)
+            return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio, "demo_disponivel": slug is None and _vinculo_demo() is not None}, status=401)
 
         if autenticado.segundo_fator_ativo:
             request.session.flush()
@@ -84,7 +113,7 @@ def entrar(request, slug=None):
                 request.session[PRE_2FA_CONSULTORIO] = str(consultorio.pk)
             return redirect("contas:verificar_2fa")
         return _concluir_login(request, autenticado, segundo_fator=False, consultorio_alvo=consultorio)
-    return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio})
+    return render(request, "contas/entrar.html", {"form": form, "consultorio": consultorio, "demo_disponivel": slug is None and _vinculo_demo() is not None})
 
 
 def _tem_vinculo_no_consultorio(usuario, consultorio):
@@ -175,7 +204,10 @@ def ver_como(request, usuario_pk):
         raise Http404
     auditoria.registrar(request, "ver_como", "usuario", alvo.usuario_id, original=str(original.usuario_id), alvo=str(alvo.usuario_id))
     voltando = alvo.usuario_id == original.usuario_id
+    modo_demo = request.session.get("modo_demo", False)
     login(request, alvo.usuario, backend="django.contrib.auth.backends.ModelBackend")
+    if modo_demo:
+        request.session["modo_demo"] = True
     request.session["segundo_fator_ok"] = True
     request.session["consultorio_id"] = str(consultorio.pk)
     if not voltando:

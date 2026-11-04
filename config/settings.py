@@ -197,6 +197,8 @@ MEUPSIQ_CARENCIA_DIAS = 15
 
 # Slugs de consultorios (so demonstracao/homologacao!) em que prontuarios abrem sem 2FA e o admin os le. Vazio em producao.
 MEUPSIQ_CONSULTORIOS_SEM_2FA = env.list("MEUPSIQ_CONSULTORIOS_SEM_2FA", default=[])
+# Botao "Explorar demonstracao" no login: entra, somente leitura, com este admin de um consultorio da lista acima. Vazio em producao.
+MEUPSIQ_DEMO_EXPLORAR_EMAIL = env("MEUPSIQ_DEMO_EXPLORAR_EMAIL", default="")
 
 # Importacao de pacientes por planilha
 MEUPSIQ_IMPORTACAO_MAX_BYTES = 5 * 1024 * 1024
