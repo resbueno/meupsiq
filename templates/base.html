@@ -77,6 +77,7 @@
     {% elif consultorio_ativo.status == 'somente_leitura' %}
       <div class="aviso-leitura" role="status">Consultório em somente leitura por pendência de pagamento. Você pode consultar e exportar os dados.</div>
     {% endif %}
+    {% if request.session.modo_demo %}<div class="aviso-leitura" role="status"><strong>Modo demonstração, somente leitura.</strong> Dados fictícios; nada pode ser criado ou alterado. <form method="post" action="{% url "contas:sair" %}">{% csrf_token %}<button class="botao secundario pequeno" type="submit">Sair da demonstração</button></form></div>{% endif %}
     {% if ver_como %}<div class="aviso-leitura" role="status"><strong>Demonstração · ver como:</strong>
       {% for p in ver_como.perfis %}<form method="post" action="{% url 'contas:ver_como' p.usuario.pk %}" class="em-linha">{% csrf_token %}<button class="botao {% if p.atual %}pequeno{% else %}secundario pequeno{% endif %}" type="submit"{% if p.atual %} aria-current="true" disabled{% endif %}>{{ p.usuario.nome }} · {{ p.perfil }}</button></form> {% endfor %}
     </div>{% endif %}

@@ -129,6 +129,9 @@ class SomenteLeituraMiddleware:
 
     LIVRES = ("/sair/", "/conta/", "/exportacao/", "/admin/", "/operador/suporte/sair/")
     SO_EXPORTACAO = ("/exportacao/", "/sair/", "/conta/", "/static/", "/admin/")
+    # Demonstracao publica (botao no login): so navega, troca de perfil e sai. Configuracoes da conta compartilhada ficam fechadas.
+    DEMO_LIVRES = ("/sair/", "/conta/ver-como/")
+    DEMO_BLOQUEADOS = ("/conta/2fa/", "/conta/dispositivos/", "/admin/")
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -137,6 +140,12 @@ class SomenteLeituraMiddleware:
         consultorio = getattr(request, "consultorio", None)
         if consultorio and consultorio.status == Consultorio.Status.ENCERRADO and not request.path_info.startswith(self.SO_EXPORTACAO):
             return redirect("relatorios:exportacao")
+        if request.session.get("modo_demo"):
+            if request.path_info.startswith(self.DEMO_BLOQUEADOS) or (
+                request.method not in METODOS_SEGUROS and not request.path_info.startswith(self.DEMO_LIVRES)
+            ):
+                messages.warning(request, "Demonstração em modo somente leitura: esta ação não está disponível.")
+                return redirect("painel")
         if getattr(request, "suporte", None) and request.method not in METODOS_SEGUROS and not request.path_info.startswith(self.LIVRES):
             return HttpResponseForbidden("O acesso de suporte é somente leitura.")
         if (
